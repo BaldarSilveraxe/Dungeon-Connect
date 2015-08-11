@@ -4,9 +4,9 @@
 var DungeonConnect = DungeonConnect || (function(){
     'use strict';
     
-    var version = 0.2,
+    var version = 0.3,
         lastUpdate = 1439207564, //Unix timestamp
-        schemaVersion = 0.2, 
+        schemaVersion = 0.3, 
         
         defaultWalls = 'Simple_Stone',
         wallTextures = [],
@@ -1181,7 +1181,35 @@ var DungeonConnect = DungeonConnect || (function(){
                         left: (Math.floor(obj.get('left') / 70) * 70) + 35
                     });
                 },
-                
+                nudgeBranch = function(id) {
+                    var x,xy = utilities.GetMapCenterSquare(),m,c,pathReturned,
+                        postValues = {
+                            left: 35, top: 35,
+                            width: 70, height: 70,
+                            layer: controls, pageid: state.DungeonConnect.page || Campaign().get('playerpageid'),
+                            imgsrc: post, controlledby: 'NEWDungeonConnectPost',
+                            tint_color: postGood, isdrawing: true
+                        };
+                    x = getObj('graphic', id);
+                    postValues.left = x.get('left') < xy.x ? x.get('left') + 280 : x.get('left') - 280;
+                    postValues.top = x.get('top') < xy.y ? x.get('top') + 210 : x.get('top') - 210;
+                    c = createObj('graphic', postValues);
+                    postValues.imgsrc = middle;
+                    postValues.left = (postValues.left + x.get('left')) / 2;
+                    postValues.top = (postValues.top + x.get('top')) / 2;
+                    postValues.controlledby = 'NewMiddlePost';
+                    m = createObj('graphic', postValues);
+                    _.debounce(pathReturned = createSegmentPath(x, c, m), 500);
+                    pathUpdated.push(pathReturned.id);
+                    nodeUpdated.push(pathReturned.aNodeId);
+                    nodeUpdated.push(pathReturned.bNodeId);  
+                },
+                nudgeDetect = function(obj) {
+                    if( 0 !== obj.get('rotation')) {
+                        return true;
+                    }
+                    return false;
+                },
                 createSegmentPath = function(a, b, m) {
                     var segmentStateValues, pathValues, p, g, crossLines,existingPaths,crosses = false,existingPathData;
                     if( undefined !== stateIndexABBA[a.get('id') + ':' + b.get('id')] 
@@ -1537,7 +1565,7 @@ var DungeonConnect = DungeonConnect || (function(){
                     });
                     d.set('controlledby','removed'); d.remove(); 
                 },
-                getInput = function(input) {
+                getInput = function(input, id) {
                     switch(input.action){
                         case 'AddSegment':     addSegment();                   break;
                         case 'AddPoint':       addPoint(input.message);        break;
@@ -1549,6 +1577,9 @@ var DungeonConnect = DungeonConnect || (function(){
                     nodeUpdated = _.uniq(nodeUpdated);
                     setTimeout(function() {wallDrawing.Input(); }, 200);
                     setTimeout(function() {nodeDrawing.Input(); }, 200);
+                    if('nudge' === input ) {
+                        nudgeBranch(id);
+                    }
                 },
                 middlePostMove = function(obj) {
                     var pathId = stateIndexM[obj.get('id')],a,b,leftMove,topMove,oldLeft,oldTop,deltaLeft,deltaTop;
@@ -1709,10 +1740,20 @@ var DungeonConnect = DungeonConnect || (function(){
                         middleDeleted(obj); }
                 },
                 handleGraphicChange = function(obj) {
+                    var nudge;
                     if( 'NEWDungeonConnectPost' === obj.get('controlledby') ) {
                         obj.set('controlledby', 'DungeonConnectPost'); postOverlapCheck(obj); return; }
                     if( 'DungeonConnectPost' === obj.get('controlledby') ) {
-                        forceProperPlacementPost(obj); postOverlapCheck(obj); updateSegment(obj); getInput('none');}
+                        nudge = nudgeDetect(obj); 
+                        forceProperPlacementPost(obj); 
+                        postOverlapCheck(obj); 
+                        updateSegment(obj); 
+                        if (false === nudge ){
+                            getInput('none');
+                        }else{
+                            getInput('nudge', obj.get('id'));
+                        } 
+                    }
                     if( 'NewMiddlePost' === obj.get('controlledby') ) {
                         obj.set('controlledby', 'MiddlePost'); return; }
                     if( -1 !== obj.get('controlledby').indexOf('MiddlePost') ){
