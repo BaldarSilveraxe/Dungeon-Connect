@@ -1,13 +1,14 @@
-/*global state, sendChat, filterObjs, getObj, on, createObj, log, setTimeout, _, DungeonConnectWalls, findObjs, playerIsGM, sendPing */
-/*jslint white: true, bitwise: true */
+/*global state, sendChat, filterObjs, getObj, on, createObj, log, setTimeout, _, DungeonConnectWalls, findObjs, playerIsGM, sendPing, toFront */
+/*jslint white: true, bitwise: true, for: true */
 
 var DungeonConnect = DungeonConnect || (function(){
     'use strict';
-        
-    var version = 0.1,
+    
+    var version = 0.2,
         lastUpdate = 1439207564, //Unix timestamp
-        schemaVersion = 0.1, 
-// ~~~> System Values <~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        schemaVersion = 0.2, 
+        
+        defaultWalls = 'Simple_Stone',
         wallTextures = [],
         stateIndexX = [],
         stateIndexM = [],
@@ -18,9 +19,8 @@ var DungeonConnect = DungeonConnect || (function(){
         nodeUpdated = [],
         stateFeatureIndexFeature = [],
         stateFeatureIndexGM = [],
-// ~~~> System Values <~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-         
-         
+
+
 // ~~~> utilities <~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         deferred = {
             batchSize: 30,
@@ -28,13 +28,10 @@ var DungeonConnect = DungeonConnect || (function(){
             batchDefer: 10
         },
         deferredCreateObj = (function(){
-            var queue = [],
-                creator,
-            
+            var queue = [], creator,
             doCreates = function(){
                 var done = 0,
                     request;
-                    
                 while(queue.length && ++done < deferred.batchSize ){
                     request = queue.shift();
                     createObj(request.type,request.properties);
@@ -42,7 +39,7 @@ var DungeonConnect = DungeonConnect || (function(){
                 if( queue.length ){
                     creator = setTimeout(doCreates, deferred.batchDefer );
                 } else {
-                creator = false;
+                    creator = false;
                 }
             };
             return function(type,properties){
@@ -52,7 +49,6 @@ var DungeonConnect = DungeonConnect || (function(){
             }
         };
         }()),
-        
         utilities = (function(){
             var macrosInstall = function() {
                     var toggleIcon = 'https://s3.amazonaws.com/files.d20.io/images/8434850/ijzdctgdJpFj_Q2NC9GFvg/thumb.png?1427221316',
@@ -73,7 +69,7 @@ var DungeonConnect = DungeonConnect || (function(){
                     });
                     deferredCreateObj('graphic', {
                         pageid: page, imgsrc: tile, name: 'wallpart', left: x, top: y, width: 70, height: 70, layer: 'map', controlledby: path, rotation: rot
-                        });
+                    });
                 },
                 checkAngle = function(ax,ay,bx,by) {
                     var ty = by - ay, tx = bx - ax, theta = Math.atan2(ty, tx);
@@ -98,10 +94,6 @@ var DungeonConnect = DungeonConnect || (function(){
                         case 0:    bitValue = 1;   break;
                     }
                     return bitValue;
-                },
-                eigthBitClockwise = function(value, degree) {
-                    var shift = (degree/90) * 2;
-                    return (((value | (value << 8)) >> shift) & 255);
                 },
                 intersects = function (a,b,c,d,p,q,r,s) {
                     var det, gamma, lambda;
@@ -159,7 +151,7 @@ var DungeonConnect = DungeonConnect || (function(){
                         objectTop, objectLeft, pathString, graphicID; 
                     _.each(givenPathData, function(given) {
                         temp = [];
-                        for(i = 0; i < given.path.length; i++) {
+                        for(i = 0; i < given.path.length; i = i + 1) {
                             newX = given.path[i][0];
                             newY = given.path[i][1];
                             if(given.fliph){newX = given.width - given.path[i][0]; }
@@ -180,7 +172,7 @@ var DungeonConnect = DungeonConnect || (function(){
                         minX = false;
                         maxY = 0;
                         minY = false;
-                        for(i = 0; i < inputPath.length; i++) {
+                        for(i = 0; i < inputPath.length; i = i + 1) {
                             PathArray.push([inputPath[i][0], inputPath[i][1]]);
                             PathArray[i] = pathingRotation(angle, PathArray[i],given.width,given.height);
                             if(PathArray[i][0] > maxX) {maxX = PathArray[i][0]; }
@@ -192,13 +184,13 @@ var DungeonConnect = DungeonConnect || (function(){
                         objectHeight = maxY - minY;
                         objectTop = minY + (objectHeight/2); 
                         objectLeft = minX + (objectWidth/2);
-                        for(i = 0; i < PathArray.length; i++) {
+                        for(i = 0; i < PathArray.length; i = i + 1) {
                             PathArray[i][0] = PathArray[i][0] - minX;
                             PathArray[i][1] = PathArray[i][1] - minY;
                         }
                         pathString = "";
-                        for(i = 0; i < PathArray.length; i++) {
-                            if(i != 0) {
+                        for(i = 0; i < PathArray.length; i = i + 1) {
+                            if(i !== 0) {
                                 pathString += ",[\"L\"," + PathArray[i][0] + "," + PathArray[i][1] + "]";
                             } else {
                                 pathString = "[\[\"M\"," + PathArray[i][0] + "," + PathArray[i][1] + "]";  
@@ -227,7 +219,6 @@ var DungeonConnect = DungeonConnect || (function(){
                 BitDirection: bitDirection,
                 GetMapCenterSquare: getMapCenterSquare,
                 DeferredWall: deferredWall,
-                BitRotation: eigthBitClockwise,
                 Intersects: intersects,
                 ClearMap: clearMap,
                 Fill: fill,
@@ -237,21 +228,44 @@ var DungeonConnect = DungeonConnect || (function(){
             };
         }()),
 // ~~~> utilities <~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            
-            
+
+
+
 // ~~~> Chat Output <~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         chatOutput = (function(){
             var criticalSRC = 'https://s3.amazonaws.com/files.d20.io/images/6422880/SIjBHWJNC8f9a73Rg_VkOQ/thumb.png?14164996807',
                 caution_SRC = 'https://s3.amazonaws.com/files.d20.io/images/6422879/M-oWEvMt1bhC2M-bdi28tA/thumb.png?1416499678',
-                border = '#FF0000', background = '#FFBABA', color = '#D8000C', who = '/direct ', src = criticalSRC, text = 'Error',
+                border = '#FF0000', background = '#FFBABA', color = '#D8000C', who = '/direct ', src, text = 'Error',
                 cssButtonAnchor = ' style="border: 1px solid AliceBlue; background-color: SteelBlue; color: white;" ',
                 cssButtonSpan = ' style="color: white; font-weight: normal; display: block; width: 150px;" ',
-                cssButtonAnchor2 = ' style="border: 1px solid SandyBrown; background-color: Tomato; color: white;" ',
-                cssButtonSpan2 = ' style="color: white; font-weight: normal; display: block; width: 150px;" ',
                 cssButtonAnchorImg  = ' style="border: 1px solid Black; background-color: White; color: white;" ',
                 cssButtonImg  = ' style="padding: 0px 0px 0px 0px; outline: none; border: none;" ',
+                cssButtonAnchor2 = ' style="border: 1px solid SandyBrown; background-color: Tomato; color: white;" ',
                 help = function() {
-                    sendChat('Dungeon Connect','Help');
+                    sendChat('Dungeon Connect','/w "' + state.DungeonConnect.who + '" <br>'
+                        + '<a href="https://app.roll20.net/forum/post/2283776/script-dungeon-connect-over-70-tiles-for-use-with-api-line-segment-script/?pageforid=2283776#post-2283776">'
+                        +'<u>LINK: Find help on the forum!</u></a>');
+                },
+                alertMessage  = function(input) {
+                    var message = input.text;
+                    switch(input.type) {
+                        case 'Caution':
+                            src = caution_SRC;
+                            if( _.has(state,'DungeonConnect') ) { who = '/w "' + state.DungeonConnect.who + '" '; }
+                            border = '#9F6000'; background = '#FEEFB3'; color = '#9F6000'; message = '<b>Caution.</b> ' + message;
+                        break;
+                        default: src = criticalSRC; message = '<b>Script Halted.</b> ' + message; break;
+                    }
+                    text = who + '<div style="padding:1px 3px; border: 1px solid ' 
+                        + border + '; background: ' + background + '; color: ' + color + '; font-size: 80%;">'
+                        + '<img src="' + src + '" style="vertical-align: text-bottom; width:20px; height:20px; padding: 0px 5px;" />' 
+                        + message + '<br>' + '<a href="!DungeonConnectHelp" style="padding:0px 0px;border: 0px; border-collapse: collapse'
+                        + 'color: ' + color + '; font-size: 100%; background: ' + background + '">'
+                        + '<span style="color: ' + color + '; font-size: 80%;"><b>?-Help</b></span></a> | '
+                        + '<a href="!DungeonConnectMenu" style="padding:0px 0px;border: 0px; border-collapse: collapse'
+                        + 'color: ' + color + '; font-size: 100%; background: ' + background + '">'
+                        + '<span style="color: ' + color + '; font-size: 80%;"><b>Main-Menu</b></span></a>';
+                    sendChat('Dungeon Connect', text);
                 },
                 cellhtml = function(href,aStyle,url,imgStyle) {
                     var html = '<div style="display: table-cell; border-collapse: collapse; padding-left: 0px; padding-right: 0px;" >'
@@ -308,53 +322,18 @@ var DungeonConnect = DungeonConnect || (function(){
                     sendChat('Main Menu', menuText);
                 },
                 mainMenuLink = function() {
-                    sendChat('Main Menu', '/w '  
+                    sendChat('Main Menu', '/w "'  
                         + state.DungeonConnect.who 
-                        + ' <a href="!DungeonConnectMenu"' + cssButtonAnchor + ' ><span' + cssButtonSpan 
+                        + '" <a href="!DungeonConnectMenu"' + cssButtonAnchor + ' ><span' + cssButtonSpan 
                         + '>Dungeon Draw Menu</span></a>'
                     );
-                },
-                alertMessage  = function(input) {
-                    var message = input.text;
-                    switch(input.type) {
-                        case 'Caution':
-                            src = caution_SRC;
-                            if( _.has(state,'DungeonConnect') ) {
-                                who = '/w ' + state.DungeonConnect.who + ' ';
-                            }
-                            border = '#9F6000'; 
-                            background = '#FEEFB3'; 
-                            color = '#9F6000'; 
-                        break;
-                        default: 
-                            src = caution_SRC;
-                        break;
-                    }
-                    text = who + '<div style="padding:1px 3px; border: 1px solid ' 
-                        + border + '; background: ' 
-                        + background + '; color: ' 
-                        + color + '; font-size: 80%;">'
-                        + '<img src="' 
-                        + src + '" style="vertical-align: text-bottom; width:20px; height:20px; padding: 0px 5px;" />' 
-                        + message + '<br>'
-                        + '<a href="!DungeonConnectHelp" style="padding:0px 0px;border: 0px; border-collapse: collapse'
-                        + 'color: ' + color + '; font-size: 100%; background: ' + background + '">'
-                        + '<span style="color: ' + color + '; font-size: 80%;">'
-                        +'<b>?-Help</b></span></a> | '
-                        + '<a href="!DungeonConnectMenu" style="padding:0px 0px;border: 0px; border-collapse: collapse'
-                        + 'color: ' + color + '; font-size: 100%; background: ' + background + '">'
-                        + '<span style="color: ' + color + '; font-size: 80%;">'
-                        +'<b>Main-Menu</b></span></a>';
-                    sendChat('Dungeon Connect', text);
                 },
                 changeTexture = function() {
                     var installedWalls = [];
                     text = '/w '  + state.DungeonConnect.who  + ' '; installedWalls = [];
-                    Object.keys(DungeonConnectWalls.WallTextures).forEach(function(key) {
-                        installedWalls.push(key);
-                    });
+                    Object.keys(DungeonConnectWalls.WallTextures).forEach(function(key) { installedWalls.push(key); });
                     _.each(installedWalls, function(eachTextures) {
-                        text += '<br><a href="!DungeonConnectSetTexture ' + eachTextures + '"' + cssButtonAnchor2 + ' ><span' + cssButtonSpan2 + '>' + eachTextures + '</span></a>';
+                        text += '<br><a href="!DungeonConnectSetTexture ' + eachTextures + '"' + cssButtonAnchor2 + ' ><span' + cssButtonSpan + '>' + eachTextures + '</span></a>';
                     });
                     sendChat('Select Texture', text);
                     chatOutput.Input({action: 'main'});
@@ -379,8 +358,8 @@ var DungeonConnect = DungeonConnect || (function(){
             };
         }()), 
 // ~~~> Chat Output <~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            
-            
+
+
 // ~~~> Features Toggle <~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         featuresToggle = (function(){
             var getInput = function(input) {
@@ -507,8 +486,8 @@ var DungeonConnect = DungeonConnect || (function(){
             };
             }()),
 // ~~~> Features Toggle <~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            
-            
+
+
 // ~~~> Features <~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         features = (function(){
             var stateAdd = function(feature,control) {
@@ -541,9 +520,9 @@ var DungeonConnect = DungeonConnect || (function(){
                     stateAdd(value.get('id'),controller.get('id'));
                 },
                 door = function(action,value) {
-                    var center = utilities.GetMapCenterSquare(),feature,controller,newRotation, newLeft, newTop, pairObj,floorParts,fId, newLeft2, newTop2;
+                    var newRotation, newLeft, newTop, pairObj,floorParts,fId, newLeft2, newTop2;
                     switch(action){
-                        case 'add': placeFeature(value,-35,-35,280,140); return; break;
+                        case 'add': placeFeature(value,-35,-35,280,140); break;
                         case 'newadd':
                             value.set('controlledby', 'feature');
                             placeContorller(value,-35);
@@ -593,14 +572,13 @@ var DungeonConnect = DungeonConnect || (function(){
                                 case 270: newLeft2 = newLeft - 35; newTop2 = newTop - 35; newLeft = newLeft - 35; newTop = newTop + 35; break;
                             }
                             placeFloor(newLeft,newTop,fId); placeFloor(newLeft2,newTop2,fId);
-                            return;
                         break;
                     }
                 },
                 bars = function(action,value) {
-                    var center = utilities.GetMapCenterSquare(),feature,controller,newRotation, newLeft, newTop, pairObj,floorParts,fId, newLeft2, newTop2;
+                    var newRotation, newLeft, newTop, pairObj,floorParts,fId;
                     switch(action){
-                        case 'add': placeFeature(value,-35,0,280,70); return; break;
+                        case 'add': placeFeature(value,-35,0,280,70); break;
                         case 'newadd':
                             value.set('controlledby', 'feature'); placeContorller(value,0);
                             placeFloor(value.get('left') + 35,value.get('top'),value.get('id'));
@@ -638,9 +616,9 @@ var DungeonConnect = DungeonConnect || (function(){
                     }
                 },
                 secret = function(action,value) {
-                    var center = utilities.GetMapCenterSquare(),feature,controller,newRotation, newLeft, newTop, pairObj,floorParts,fId, newLeft2, newTop2;
+                    var newRotation, newLeft, newTop, pairObj,floorParts,fId;
                     switch(action){
-                        case 'add': placeFeature(value,-35,0,280,70); return; break;
+                        case 'add': placeFeature(value,-35,0,280,70); break;
                         case 'newadd':
                             value.set({controlledby: 'feature', aura1_color: "#FFFF99", aura1_radius: -7}); placeContorller(value,0);
                             placeFloor(value.get('left') + 35,value.get('top'),value.get('id'));
@@ -678,7 +656,7 @@ var DungeonConnect = DungeonConnect || (function(){
                     }
                 },
                 stairs = function(action,value) {
-                    var center = utilities.GetMapCenterSquare(),feature,controller,newRotation, newLeft, newTop, pairObj,floorParts,fId, newLeft2, newTop2;
+                    var center = utilities.GetMapCenterSquare(),controller,newRotation, newLeft, newTop, pairObj, fId;
                     switch(action){
                         case 'add': 
                             createObj('graphic', {
@@ -720,7 +698,6 @@ var DungeonConnect = DungeonConnect || (function(){
                     }
                 },
                 add = function(tile) {
-                    var center = utilities.GetMapCenterSquare(),feature;
                     switch(tile){
                         case 'DCF_001':
                         case 'DCF_002':
@@ -771,7 +748,7 @@ var DungeonConnect = DungeonConnect || (function(){
                     _.each(pathParts, function(pp) {pp.remove(); });
                 },
                 handleGraphicChange = function(obj) {
-                    var controller,newObj,pairObj;
+                    var pairObj;
                     if( 'NEWfeature' === obj.get('controlledby') ) {
                         switch(obj.get('name')){
                             case 'DCF_001':
@@ -791,17 +768,6 @@ var DungeonConnect = DungeonConnect || (function(){
                                 stairs('newadd',obj);
                             break;
                         }
-                        return;
-                        controller = createObj('graphic', {
-                            pageid: state.DungeonConnect.page || Campaign().get('playerpageid'), 
-                            imgsrc: 'https://s3.amazonaws.com/files.d20.io/images/11109030/bKRDvSF5f60zZFIbv4k3Bw/thumb.png?1438044758', 
-                            name: 'controller', left: obj.get('left'), top: obj.get('top'), width: 140, height: 140,
-                            layer: 'gmlayer', isdrawing: true, controlledby: 'NEWcontroller', tint_color: '#ffff00'
-                        });
-                        placeFloor(obj.get('left') + 35,obj.get('top') - 35,obj.get('id'));
-                        placeFloor(obj.get('left') - 35,obj.get('top') - 35,obj.get('id'));
-                        stateAdd(obj.get('id'),controller.get('id'));
-                        return;
                     }
                     if( 'NEWcontroller' === obj.get('controlledby') ) {obj.set('controlledby', 'controller'); return; }
                     if ( 'controller' === obj.get('controlledby') ) {
@@ -852,8 +818,8 @@ var DungeonConnect = DungeonConnect || (function(){
             };
             }()),
 // ~~~> Features <~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            
-            
+
+
 // ~~~> FloorDrawing <~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         floorDrawing = (function(){
             var wallCheck = function (pixelPos) {
@@ -871,7 +837,7 @@ var DungeonConnect = DungeonConnect || (function(){
                 });
             },
             fillArea = function(l,t) {
-                    var page, locationList = [{x: l, y: t}],atLocation,createList = [],mapMinX,mapMinY,mapMaxX,mapMaxY;
+                    var page, locationList = [{x: l, y: t}],atLocation,mapMinX,mapMinY,mapMaxX,mapMaxY;
                     page = findObjs({id: state.DungeonConnect.page || Campaign().get('playerpageid') });
                     mapMinX = 0;
                     mapMinY = 0;
@@ -906,14 +872,14 @@ var DungeonConnect = DungeonConnect || (function(){
             };
             }()),
 // ~~~> FloorDrawing <~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            
-          
+
+
 // ~~~> NodeDrawing <~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         nodeDrawing = (function(){
             var nodeCenter = function(node,nodeValue) {
                     var missSrc = _.where(wallTextures, {pack: state.DungeonConnect.currentWalls, key: 'DC_000'})[0],
                         findSrc = _.where(wallTextures, {pack: state.DungeonConnect.currentWalls, value: nodeValue})[0],
-                        tileSrc,nodeTest;
+                        tileSrc;
                     if( undefined === findSrc ) {
                         tileSrc = missSrc;
                     }else{
@@ -1005,7 +971,7 @@ var DungeonConnect = DungeonConnect || (function(){
                 },
             
                 getInput = function() {
-                    var a,wallPart,x;
+                    var a,wallPart;
                     _.each(nodeUpdated, function(nodeId) {
                         a = getObj('graphic',nodeId);
                         wallPart = findObjs({type: 'graphic', controlledby: nodeId });
@@ -1037,8 +1003,8 @@ var DungeonConnect = DungeonConnect || (function(){
         };
         }()),
 // ~~~> NodeDrawing <~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-          
-          
+
+
 // ~~~> WallDrawing <~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         wallDrawing = (function(){
             var p,
@@ -1175,9 +1141,8 @@ var DungeonConnect = DungeonConnect || (function(){
             };
         }()),
 // ~~~> WallDrawing <~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-           
-           
-           
+
+
 // ~~~> Path Drawing <~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  
         pathDrawing = (function(){
             var post = 'https://s3.amazonaws.com/files.d20.io/images/11412286/uflq2DUCrTk89QlWdbjP_Q/thumb.png?1439148046',
@@ -1765,33 +1730,21 @@ var DungeonConnect = DungeonConnect || (function(){
         };
     }()),
 // ~~~> Path Drawing <~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  
-           
-           
+
+
 // ~~~> inputManagement <~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  
         inputManagement = (function(){
             var handleInput = function(msg) {
                     var message = _.clone(msg), messageArguments = msg.content.split(/\s+/);
-                    if ( ('api' !== message.type) || (true === state.DungeonConnect.processing) || (false === playerIsGM(message.playerid)) ) {
-                        return; 
-                    }
-                    if ( messageArguments[0] === '!DungeonConnectMode') { 
-                        state.DungeonConnect.drawMode = !state.DungeonConnect.drawMode; 
-                    }
-                    if( messageArguments[0] === '!DungeonConnectMore' ){
-                        chatOutput.Input({action: 'menu', text: 'more'});
-                        return; 
-                    }
-                    if( messageArguments[0] === '!DungeonConnectHelp' ){
-                        chatOutput.Input({action: 'help'});
-                        return; 
-                    }
+                    if ( ('api' !== message.type) || (true === state.DungeonConnect.processing) || (false === playerIsGM(message.playerid)) ) { return; }
+                    if ( messageArguments[0] === '!DungeonConnectMode') { state.DungeonConnect.drawMode = !state.DungeonConnect.drawMode; }
+                    if( messageArguments[0] === '!DungeonConnectMore' ) { chatOutput.Input({action: 'menu', text: 'more'});  return; }
+                    if( messageArguments[0] === '!DungeonConnectHelp' ) { chatOutput.Input({action: 'help'}); return; }
                     if( (messageArguments[0] === '!DungeonConnectMenu') || (messageArguments[0] === '!DungeonConnectMode') ){
                         chatOutput.Input({action: 'menu', text: ''});
                         return; 
                     }
-                    if( false === state.DungeonConnect.drawMode ) {
-                        return; 
-                    }
+                    if( false === state.DungeonConnect.drawMode ) { return; }
                     state.DungeonConnect.processing = true;
                     switch(messageArguments[0]) { 
                         //case '!DungeonConnectControl': control(message.playerid); break;
@@ -1821,25 +1774,48 @@ var DungeonConnect = DungeonConnect || (function(){
             };
         }()),
 // ~~~> inputManagement <~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            
-         
+
+  
 // ~~~> setupPageTracking <~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~   
         setupPageTracking = (function(){
-            var defaultWalls = 'Simple_Stone',
+            var getOwnerPage = function(id) {
+                    var playerPages = Campaign().get('playerspecificpages'), ownerPage = playerPages[id];
+                    if( undefined === ownerPage ){
+                        chatOutput.Input({ action: 'alert', type: 'Caution', text: 'Current page is the player book mark page. <b>Recommend using the party split</b> feature to select the page you wish to edit.'});
+                        return Campaign().get('playerpageid');
+                    }else{
+                        return ownerPage;
+                    }
+                },
+                checkOwnerName = function(players,ownerId) {
+                    var whoToTest = _.where(players, {id: ownerId})[0].get('displayname');
+                        return _.chain(players).map(function(p){
+                            return p.get('displayname');
+                        }).filter(function(n){
+                            return n === whoToTest;
+                        }).value().length === 1;
+                },
+                eigthBitClockwise = function(value, degree) {
+                    var shift = (degree/90) * 2;
+                    return (((value | (value << 8)) >> shift) & 255);
+                },
+                tilePusher = function(pushValues) {
+                    var angle = [0,90,180,270];
+                    _.each(angle, function(a) {
+                        wallTextures.push({
+                            key: pushValues.key, pack: pushValues.pack, type: pushValues.type, url: pushValues.url, 
+                            value: eigthBitClockwise(pushValues.value, a), degree: a, flip: pushValues.flip
+                        });
+                    });
+                },
                 indexState = function() {
                     var keyList = [],indexData;
-                    Object.keys(state.DungeonConnectPaths).forEach(function(key) {
-                        keyList.push(key);
-                    });
+                    Object.keys(state.DungeonConnectPaths).forEach(function(key) { keyList.push(key); });
                     _.each(keyList, function(eachKey) {
                         indexData = state.DungeonConnectPaths[eachKey];
-                        if( undefined === stateIndexX[indexData.aNodeId] ) {
-                            stateIndexX[indexData.aNodeId] = [];
-                        }
+                        if( undefined === stateIndexX[indexData.aNodeId] ) { stateIndexX[indexData.aNodeId] = []; }
                         stateIndexX[indexData.aNodeId].push(indexData.id);
-                        if( undefined === stateIndexX[indexData.bNodeId] ) {
-                            stateIndexX[indexData.bNodeId] = [];
-                        }
+                        if( undefined === stateIndexX[indexData.bNodeId] ) { stateIndexX[indexData.bNodeId] = []; }
                         stateIndexX[indexData.bNodeId].push(indexData.id);
                         stateIndexABBA[indexData.bNodeId + ':' + indexData.bNodeId] = indexData.id;
                         stateIndexABBA[indexData.aNodeId + ':' + indexData.bNodeId] = indexData.id;
@@ -1848,31 +1824,10 @@ var DungeonConnect = DungeonConnect || (function(){
                         stateIndexG[indexData.clone] = indexData.id;
                     });
                     keyList = []; 
-                    indexData;
-                    Object.keys(state.DungeonConnectFeatures).forEach(function(key) {
-                        keyList.push(key);
-                    });
+                    Object.keys(state.DungeonConnectFeatures).forEach(function(key) { keyList.push(key); });
                     _.each(keyList, function(eachKey) {
                         indexData = state.DungeonConnectFeatures[eachKey];
                         stateFeatureIndexGM[indexData.controller] = indexData.feature;
-                    });
-                },
-                tilePusher = function(pushValues) {
-                    wallTextures.push({
-                        key: pushValues.key, pack: pushValues.pack, type: pushValues.type, url: pushValues.url, 
-                        value: pushValues.value, degree: pushValues.degree, flip: pushValues.flip
-                    });
-                    wallTextures.push({
-                        key: pushValues.key, pack: pushValues.pack, type: pushValues.type, url: pushValues.url, 
-                        value: utilities.BitRotation(pushValues.value, 90), degree: 90, flip: pushValues.flip
-                    });
-                    wallTextures.push({
-                        key: pushValues.key, pack: pushValues.pack, type: pushValues.type, url: pushValues.url, 
-                        value: utilities.BitRotation(pushValues.value, 180), degree: 180, flip: pushValues.flip
-                    });
-                    wallTextures.push({
-                        key: pushValues.key, pack: pushValues.pack, type: pushValues.type, url: pushValues.url, 
-                        value: utilities.BitRotation(pushValues.value, 270), degree: 270, flip: pushValues.flip
                     });
                 },
                 loadPack = function() {
@@ -1891,20 +1846,12 @@ var DungeonConnect = DungeonConnect || (function(){
                                         value: eachTile.value, degree: eachTile.degree, flip: false
                                     };
                                     tilePusher(pushValues);
-                                    
                                     bits = '00000000' + parseInt(eachTile.value, 10).toString(2);
                                     bits = bits.substr(bits.length - 8);
-                                    bit8 = bits.substring(0, 1);
-                                    bit7 = bits.substring(1, 2);
-                                    bit6 = bits.substring(2, 3);
-                                    bit5 = bits.substring(3, 4);
-                                    bit4 = bits.substring(4, 5);
-                                    bit3 = bits.substring(5, 6);
-                                    bit2 = bits.substring(6, 7);
-                                    bit1 = bits.substring(7, 8);
+                                    bit8 = bits.substring(0, 1); bit7 = bits.substring(1, 2); bit6 = bits.substring(2, 3); bit5 = bits.substring(3, 4);
+                                    bit4 = bits.substring(4, 5); bit3 = bits.substring(5, 6); bit2 = bits.substring(6, 7); bit1 = bits.substring(7, 8);
                                     flip = bit6+bit7+bit8+bit1+bit2+bit3+bit4+bit5;
                                     fValue = parseInt(flip, 2);
-                                    
                                     pushValues = {
                                         key: eachTile.key, pack: eachPack, type: eachTile.type,url: eachTile.url, 
                                         value: fValue, degree: eachTile.degree, flip: true
@@ -1923,41 +1870,13 @@ var DungeonConnect = DungeonConnect || (function(){
                         });
                     });
                 },
-                checkOwnerName = function(players,ownerId) {
-                    var whoToTest = _.where(players, {id: ownerId})[0].get('displayname').split(' ')[0];
-                        return _.chain(players).map(function(p){
-                            return p.get('displayname').split(' ')[0];
-                        }).filter(function(n){
-                            return n === whoToTest;
-                        }).value().length === 1;
-                },
-                getOwnerPage = function(id) {
-                    var playerPages = Campaign().get('playerspecificpages'), ownerPage = playerPages[id];
-                    if( undefined === ownerPage ){
-                        chatOutput.Input({
-                            action: 'alert', type: 'Caution',
-                            text: '<b>Caution.</b> Current page is the player book mark page. <b>Recommend using the party split</b> feature to select the page you wish to edit.'
-                        });
-                        return Campaign().get('playerpageid');
-                    }else{
-                        return ownerPage;
-                    }
-                },
-                onStart = function() {
+                refreshData = function() {
                     var players = findObjs({type: 'player'}), ownerId = _.find(_.pluck(players,'id'),playerIsGM);
                     if ( undefined === ownerId ){
-                        chatOutput.Input({
-                            action: 'alert',
-                            type: 'Halt',
-                            text: '<b>Script Halted.</b> Script halted. State failed to initialize due to <b>no GM</b> being found.'
-                        });
+                        chatOutput.Input({action: 'alert', type: 'Halt', text: 'Script halted. State failed to initialize due to <b>no GM</b> being found.'});
                     }
                     if( !checkOwnerName(players,ownerId) ) {
-                        chatOutput.Input({
-                            action: 'alert',
-                            type: 'Halt',
-                            text: '<b>Script Halted.</b> Script halted. State failed to initialize due to <b>GMs not having unique names.<b>'
-                        });
+                        chatOutput.Input({action: 'alert', type: 'Halt', text: 'Script halted. State failed to initialize due to <b>GMs not having unique names.<b>'});
                     }
                     //delete state.DungeonConnect;
                     //delete state.DungeonConnectPaths;
@@ -1969,41 +1888,35 @@ var DungeonConnect = DungeonConnect || (function(){
                             drawMode: true, 
                             processing: false, 
                             owner: ownerId, 
-                            who: getObj('player',ownerId).get('_displayname').split(' ')[0], 
+                            who: getObj('player',ownerId).get('_displayname'), 
                             page: getOwnerPage(ownerId)
                         };
                         state.DungeonConnectPaths = {};
                         state.DungeonConnectFeatures = {};
-                        loadPack();
-                        chatOutput.Input({action: 'main'});
-                        return;
+                    }else{
+                        state.DungeonConnect.owner = ownerId;
+                        state.DungeonConnect.who = getObj('player',ownerId).get('_displayname');
+                        state.DungeonConnect.page = getOwnerPage(ownerId);
                     }
-                    state.DungeonConnect.owner = ownerId;
-                    state.DungeonConnect.who = getObj('player',ownerId).get('_displayname').split(' ')[0];
-                    state.DungeonConnect.page = getOwnerPage(ownerId);
                     loadPack();
                     indexState();
                     utilities.MacrosInstall();
                     chatOutput.Input({action: 'main'});
-                },
-                handlePageChange = function() {
-                    onStart();
-                },
+                },    
                 registerEventHandlers = function(){
-                    on('change:campaign:playerspecificpages',     handlePageChange);
-                    on('change:campaign:playerpageid',            handlePageChange);
-                    on('change:player:_displayname',              handlePageChange);
-                    on('change:player:_online',                   handlePageChange);
-                    onStart();
+                    on('change:campaign:playerspecificpages',     refreshData);
+                    on('change:campaign:playerpageid',            refreshData);
+                    on('change:player:_displayname',              refreshData);
+                    on('change:player:_online',                   refreshData);
+                    refreshData();
                 };
             return {
                 RegisterEventHandlers: registerEventHandlers
             };
         }()),
-// ~~~> setupPageTracking <~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            
-            
-// ~~~> Dungeon Connect Module <~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// ~~~> setupPageTracking <~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~   
+
+
         registerEventHandlers = function(){
             var data = new Date(lastUpdate*1000);
             log('Dungeon Connect ' + data + ' version: ' + version + ' Schema Version: ' + schemaVersion);
@@ -2025,3 +1938,4 @@ on('ready',function(){
     'use strict';
     DungeonConnect.RegisterEventHandlers(); 
 });
+    
