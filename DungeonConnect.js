@@ -4,9 +4,9 @@
 var DungeonConnect = DungeonConnect || (function(){
     'use strict';
     
-    var version = 0.4,
+    var version = 0.5,
         lastUpdate = 1439207564, //Unix timestamp
-        schemaVersion = 0.4, 
+        schemaVersion = 0.5, 
         
         defaultWalls = 'Simple_Stone',
         wallTextures = [],
@@ -133,7 +133,7 @@ var DungeonConnect = DungeonConnect || (function(){
                         return; 
                     }
                     deferredCreateObj('graphic', {
-                        pageid: state.DungeonConnect.page || Campaign().get('playerpageid'), 
+                        pageid: state.DungeonConnect.page || Campaign().get('playerpageid'), isdrawing: true,
                         imgsrc: 'https://s3.amazonaws.com/files.d20.io/images/11095197/tt3UYlxHJQJKkcbxI2yFnw/thumb.jpg?1437997243', 
                         name: 'FillBucket', left: center.x, top: center.y, width: 70, height: 70, layer: 'gmlayer', controlledby: 'FillBucket'
                     });
@@ -878,13 +878,17 @@ var DungeonConnect = DungeonConnect || (function(){
                         }
                     }
                 },
-                handleGraphicDestroy = function(obj) {
+                handleGraphicChange = function(obj) {
                     if( 'FillBucket' === obj.get('controlledby') ) {
-                        fillArea(obj.get('left'),obj.get('top'));
+                        if( 0 !== obj.get('rotation')) {
+                            fillArea(obj.get('left'),obj.get('top'));
+                            obj.set('rotation', 0)
+                        }
                     }
                 },
+                
                 registerEventHandlers = function(){
-                    on('destroy:graphic',      handleGraphicDestroy);
+                    on('change:graphic',    handleGraphicChange);
                 };
             return {
                 RegisterEventHandlers: registerEventHandlers
@@ -1200,6 +1204,50 @@ var DungeonConnect = DungeonConnect || (function(){
                         left: (Math.floor(obj.get('left') / 70) * 70) + 35
                     });
                 },
+                nudgeAddPoint = function(id) {
+                    var pathId,p,a,b,m,g,c,cx,cy,m1,m2,pathReturned,
+                        postValues = {
+                            left: 35, top: 35, width: 70, height: 70,
+                            layer: controls, pageid: state.DungeonConnect.page || Campaign().get('playerpageid'),
+                            imgsrc: post, controlledby: 'NEWDungeonConnectPost',
+                            tint_color: postGood, isdrawing: true
+                        };
+                    pathId = stateIndexM[id];
+                    p = getObj('path', pathId);
+                    a = getObj('graphic', state.DungeonConnectPaths[pathId].aNodeId);
+                    b = getObj('graphic', state.DungeonConnectPaths[pathId].bNodeId);
+                    m = getObj('graphic', state.DungeonConnectPaths[pathId].mNodeId);
+                    g = getObj('path', state.DungeonConnectPaths[pathId].clone);
+                    if( undefined !== a && undefined !== b && undefined !== m ){
+                        cx = (Math.floor(((a.get('left') + b.get('left')) / 2) / 70) * 70) + 35;
+                        cy = (Math.floor(((a.get('top') + b.get('top')) / 2) / 70) * 70) + 35;
+                        postValues.left = cx; 
+                        postValues.top = cy;
+                        c = createObj('graphic', postValues);
+                        postValues.imgsrc = middle;
+                        postValues.left = (cx + a.get('left')) / 2;
+                        postValues.top = (cy + a.get('top')) / 2;
+                        postValues.controlledby = 'NewMiddlePost';
+                        m1 = createObj('graphic', postValues);
+                        postValues.left = (cx + b.get('left')) / 2;
+                        postValues.top = (cy + b.get('top')) / 2;
+                        m2 = createObj('graphic', postValues);
+                        delete state.DungeonConnectPaths[p.get('id')];
+                        stateIndexX[a.get('id')] = _.without(stateIndexX[a.get('id')], pathId);
+                        stateIndexX[b.get('id')] = _.without(stateIndexX[b.get('id')], pathId);
+                        p.set('controlledby', 'removed'); p.remove(); delete stateIndexP[p.get('id')];
+                        g.set('controlledby', 'removed'); g.remove(); delete stateIndexG[g.get('id')]; 
+                        m.set('controlledby', 'removed'); m.remove(); delete stateIndexM[m.get('id')];
+                        _.debounce(pathReturned = createSegmentPath(a, c, m1), 500);
+                        pathUpdated.push(pathReturned.id);
+                        nodeUpdated.push(pathReturned.aNodeId);
+                        nodeUpdated.push(pathReturned.bNodeId);
+                        _.debounce(pathReturned = createSegmentPath(b, c, m2), 500);
+                        pathUpdated.push(pathReturned.id);
+                        nodeUpdated.push(pathReturned.aNodeId);
+                        nodeUpdated.push(pathReturned.bNodeId);
+                    }
+                },
                 nudgeBranch = function(id) {
                     var x,xy = utilities.GetMapCenterSquare(),m,c,pathReturned,
                         postValues = {
@@ -1437,41 +1485,7 @@ var DungeonConnect = DungeonConnect || (function(){
                         });
                         return;
                     }
-                    pathId = stateIndexM[selected[0].get('id')];
-                    p = getObj('path', pathId);
-                    a = getObj('graphic', state.DungeonConnectPaths[pathId].aNodeId);
-                    b = getObj('graphic', state.DungeonConnectPaths[pathId].bNodeId);
-                    m = getObj('graphic', state.DungeonConnectPaths[pathId].mNodeId);
-                    g = getObj('path', state.DungeonConnectPaths[pathId].clone);
-                    if( undefined !== a && undefined !== b && undefined !== m ){
-                        cx = (Math.floor(((a.get('left') + b.get('left')) / 2) / 70) * 70) + 35;
-                        cy = (Math.floor(((a.get('top') + b.get('top')) / 2) / 70) * 70) + 35;
-                        postValues.left = cx; 
-                        postValues.top = cy;
-                        c = createObj('graphic', postValues);
-                        postValues.imgsrc = middle;
-                        postValues.left = (cx + a.get('left')) / 2;
-                        postValues.top = (cy + a.get('top')) / 2;
-                        postValues.controlledby = 'NewMiddlePost';
-                        m1 = createObj('graphic', postValues);
-                        postValues.left = (cx + b.get('left')) / 2;
-                        postValues.top = (cy + b.get('top')) / 2;
-                        m2 = createObj('graphic', postValues);
-                        delete state.DungeonConnectPaths[p.get('id')];
-                        stateIndexX[a.get('id')] = _.without(stateIndexX[a.get('id')], pathId);
-                        stateIndexX[b.get('id')] = _.without(stateIndexX[b.get('id')], pathId);
-                        p.set('controlledby', 'removed'); p.remove(); delete stateIndexP[p.get('id')];
-                        g.set('controlledby', 'removed'); g.remove(); delete stateIndexG[g.get('id')]; 
-                        m.set('controlledby', 'removed'); m.remove(); delete stateIndexM[m.get('id')];
-                        _.debounce(pathReturned = createSegmentPath(a, c, m1), 500);
-                        pathUpdated.push(pathReturned.id);
-                        nodeUpdated.push(pathReturned.aNodeId);
-                        nodeUpdated.push(pathReturned.bNodeId);
-                        _.debounce(pathReturned = createSegmentPath(b, c, m2), 500);
-                        pathUpdated.push(pathReturned.id);
-                        nodeUpdated.push(pathReturned.aNodeId);
-                        nodeUpdated.push(pathReturned.bNodeId);
-                    }
+                    nudgeAddPoint(selected[0].get('id'));
                 },
                 addSegment = function() {
                     var mapCenterSquare = utilities.GetMapCenterSquare(), a, b, m, postValues = {
@@ -1587,6 +1601,9 @@ var DungeonConnect = DungeonConnect || (function(){
                     setTimeout(function() {nodeDrawing.Input(); }, 200);
                     if('nudge' === input ) {
                         nudgeBranch(id);
+                    }
+                    if('nudgeM' === input ) {
+                        nudgeAddPoint(id);
                     }
                 },
                 middlePostMove = function(obj) {
@@ -1765,7 +1782,14 @@ var DungeonConnect = DungeonConnect || (function(){
                     if( 'NewMiddlePost' === obj.get('controlledby') ) {
                         obj.set('controlledby', 'MiddlePost'); return; }
                     if( -1 !== obj.get('controlledby').indexOf('MiddlePost') ){
-                        middlePostMove(obj); }
+                        nudge = nudgeDetect(obj); 
+                        middlePostMove(obj); 
+                        if (false === nudge ){
+                            getInput('none');
+                        }else{
+                            getInput('nudgeM', obj.get('id'));
+                        } 
+                    }
                 },
                 registerEventHandlers = function(){
                     on('change:graphic',    handleGraphicChange);
