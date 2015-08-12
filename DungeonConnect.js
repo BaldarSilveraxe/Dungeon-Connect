@@ -4,9 +4,9 @@
 var DungeonConnect = DungeonConnect || (function(){
     'use strict';
     
-    var version = 0.3,
+    var version = 0.4,
         lastUpdate = 1439207564, //Unix timestamp
-        schemaVersion = 0.3, 
+        schemaVersion = 0.4, 
         
         defaultWalls = 'Simple_Stone',
         wallTextures = [],
@@ -239,7 +239,7 @@ var DungeonConnect = DungeonConnect || (function(){
                 cssButtonAnchor = ' style="border: 1px solid AliceBlue; background-color: SteelBlue; color: white;" ',
                 cssButtonSpan = ' style="color: white; font-weight: normal; display: block; width: 150px;" ',
                 cssButtonAnchorImg  = ' style="border: 1px solid Black; background-color: White; color: white;" ',
-                cssButtonImg  = ' style="padding: 0px 0px 0px 0px; outline: none; border: none;" ',
+                cssButtonImg  = ' style="padding: 0px 0px 0px 0px; outline: none; border: none; vertical-align: middle;" ',
                 cssButtonAnchor2 = ' style="border: 1px solid SandyBrown; background-color: Tomato; color: white;" ',
                 help = function() {
                     sendChat('Dungeon Connect','/w "' + state.DungeonConnect.who + '" <br>'
@@ -300,12 +300,31 @@ var DungeonConnect = DungeonConnect || (function(){
                             + '</div>'
                         + '</div>'
                         + '<br><a href="!DungeonConnectFillCanel"' + cssButtonAnchor + ' ><span' + cssButtonSpan + '>✗-Cancel-Fill-Area</span></a>'
-                        + '<br><a href="!DungeonConnectFill"' + cssButtonAnchor + ' ><span' + cssButtonSpan + '>◨-Fill-Area</span></a>'
-                        + '<br><a href="!DungeonConnectMergePoints"' + cssButtonAnchor + ' ><span' + cssButtonSpan + '>◉◉-Merge-Points</span></a>'
-                        + '<br><a href="!DungeonConnectConnectPoints"' + cssButtonAnchor + ' ><span' + cssButtonSpan + '>◉◉-Connect-Points</span></a>'
-                        + '<br><a href="!DungeonConnectBranchPoint"' + cssButtonAnchor + ' ><span' + cssButtonSpan + '>◉-Branch-Point</span></a>'
-                        + '<br><a href="!DungeonConnectAddPoint"' + cssButtonAnchor + ' ><span' + cssButtonSpan + '>▣-Add-Point</span></a>'
-                        + '<br><a href="!DungeonConnectAddSegment"' + cssButtonAnchor + ' ><span' + cssButtonSpan + '>+-Add-Segment</span></a>'
+                        
+                        + '<br><a href="!DungeonConnectFill" ' + cssButtonAnchor + '><span' + cssButtonSpan + '>'
+                                +'<img src="https://s3.amazonaws.com/files.d20.io/images/11490036/r3DfvpoIWwNpewJgYFS-0A/thumb.png?1439404240" height="50" width="50" border="0" ' + cssButtonImg + '>'
+                            +' Fill-Area</span></a>'
+                        //+ '<br><a href="!DungeonConnectFill"' + cssButtonAnchor + ' ><span' + cssButtonSpan + '>◨-Fill-Area</span></a>'
+                        + '<br><a href="!DungeonConnectMergePoints" ' + cssButtonAnchor + '><span' + cssButtonSpan + '>'
+                                +'<img src="https://s3.amazonaws.com/files.d20.io/images/11490039/Ur4bpYIWly2GULz6q1ec0g/thumb.png?1439404250" height="50" width="50" border="0" ' + cssButtonImg + '>'
+                            +' Merge-Points</span></a>'
+                        //+ '<br><a href="!DungeonConnectMergePoints"' + cssButtonAnchor + ' ><span' + cssButtonSpan + '>◉◉-Merge-Points</span></a>'
+                        + '<br><a href="!DungeonConnectConnectPoints" ' + cssButtonAnchor + '><span' + cssButtonSpan + '>'
+                                +'<img src="https://s3.amazonaws.com/files.d20.io/images/11489856/YPzC3yXl2Cbevo7mjftnpw/thumb.png?1439403620" height="50" width="50" border="0" ' + cssButtonImg + '>'
+                            +' Connect-Points</span></a>'
+                        //+ '<br><a href="!DungeonConnectConnectPoints"' + cssButtonAnchor + ' ><span' + cssButtonSpan + '>◉◉-Connect-Points</span></a>'
+                        + '<br><a href="!DungeonConnectBranchPoint" ' + cssButtonAnchor + '><span' + cssButtonSpan + '>'
+                                +'<img src="https://s3.amazonaws.com/files.d20.io/images/11489223/Y1T2eIf8NpxHSTR0q22emA/thumb.png?1439401310" height="50" width="50" border="0" ' + cssButtonImg + '>'
+                            +' Branch-Point</span></a>'
+                        //+ '<br><a href="!DungeonConnectBranchPoint"' + cssButtonAnchor + ' ><span' + cssButtonSpan + '>◉-Branch-Point</span></a>'
+                        + '<br><a href="!DungeonConnectAddPoint" ' + cssButtonAnchor + '><span' + cssButtonSpan + '>'
+                                +'<img src="https://s3.amazonaws.com/files.d20.io/images/11489404/mgRVaaXCvFhsB-FreYk7Rw/thumb.png?1439402048" height="50" width="50" border="0" ' + cssButtonImg + '>'
+                            +' Add-Point</span></a>'
+                        //+ '<br><a href="!DungeonConnectAddPoint"' + cssButtonAnchor + ' ><span' + cssButtonSpan + '>▣-Add-Point</span></a>'
+                        + '<br><a href="!DungeonConnectAddSegment" ' + cssButtonAnchor + '><span' + cssButtonSpan + '>'
+                                +'<img src="https://s3.amazonaws.com/files.d20.io/images/11489510/LKDxr9i5o0wBehGXX8qMFQ/thumb.png?1439402349" height="50" width="50" border="0" ' + cssButtonImg + '>'
+                            +' Add-Segment</span></a>'
+                        //+ '<br><a href="!DungeonConnectAddSegment"' + cssButtonAnchor + ' ><span' + cssButtonSpan + '>+-Add-Segment</span></a>'
                         + '<br><a href="!DungeonConnectMore"' + cssButtonAnchor + ' ><span' + cssButtonSpan + '>⇓-More Commands</span></a>';
                     }else{  
                         menuText = '/w '  + state.DungeonConnect.who  + ' '
@@ -1394,18 +1413,7 @@ var DungeonConnect = DungeonConnect || (function(){
                     }else{
                         x = getObj('graphic', bNode);
                     }
-                    postValues.left = x.get('left') < xy.x ? x.get('left') + 280 : x.get('left') - 280;
-                    postValues.top = x.get('top') < xy.y ? x.get('top') + 210 : x.get('top') - 210;
-                    c = createObj('graphic', postValues);
-                    postValues.imgsrc = middle;
-                    postValues.left = (postValues.left + x.get('left')) / 2;
-                    postValues.top = (postValues.top + x.get('top')) / 2;
-                    postValues.controlledby = 'NewMiddlePost';
-                    m = createObj('graphic', postValues);
-                    _.debounce(pathReturned = createSegmentPath(x, c, m), 500);
-                    pathUpdated.push(pathReturned.id);
-                    nodeUpdated.push(pathReturned.aNodeId);
-                    nodeUpdated.push(pathReturned.bNodeId);
+                    nudgeBranch(x.get('id'));
                 },
                 addPoint = function(message) {
                     var pathId,p,a,b,m,g,c,cx,cy,m1,m2,pathReturned,
