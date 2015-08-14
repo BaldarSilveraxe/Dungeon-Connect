@@ -4,9 +4,9 @@
 var DungeonConnect = DungeonConnect || (function(){
     'use strict';
     
-    var version = 0.6,
+    var version = 0.7,
         lastUpdate = 1439553559, //Unix timestamp
-        schemaVersion = 0.6, 
+        schemaVersion = 0.7, 
         
         defaultWalls = 'Simple_Stone',
         wallTextures = [],
@@ -384,7 +384,7 @@ var DungeonConnect = DungeonConnect || (function(){
                         lastX = eachPoint[1]; lastY = eachPoint[2];
                         if( 3 !== eachPoint.length ) { check = false; return false; }
                     });
-                    if ( ('gmlayer' !== obj.get('layer')) ) { check = false; }
+                    if ( 'gmlayer' !== obj.get('layer') ) { check = false; }
                     return check;
                 },
                 snapPathing = function(obj) {
@@ -400,7 +400,7 @@ var DungeonConnect = DungeonConnect || (function(){
                     pathResult = pathResult.substring(0, pathResult.length - 1);
                     pathResult = pathResult + ']';
                     if( lastX === firstX && lastY === firstY ) {closed = true; }
-                return {path: pathResult, closedPath: closed}
+                return {path: pathResult, closedPath: closed};
                 },
                 handlePathAdd = function(obj) {
                     var goodPath = pathChecker(obj),snappedPath,newPath,ab,a,b,x1,y1,x2,y2,stepArray,f,sxy1,sxy2,lastPoint;
@@ -941,8 +941,13 @@ var DungeonConnect = DungeonConnect || (function(){
                     if( 'FillBucket' === obj.get('controlledby') ) {
                         if( 0 !== obj.get('rotation')) {
                             fillArea(obj.get('left'),obj.get('top'));
-                            obj.set('rotation', 0)
+                            log('here')
                         }
+                        obj.set({
+                                rotation: 0, 
+                                left: (Math.floor(obj.get('left')/70) * 70) + 35, 
+                                top: (Math.floor(obj.get('top')/70) * 70) + 35
+                            });
                     }
                 },
                 registerEventHandlers = function(){
@@ -1956,7 +1961,8 @@ var DungeonConnect = DungeonConnect || (function(){
             var getOwnerPage = function(id) {
                     var playerPages = Campaign().get('playerspecificpages'), ownerPage = playerPages[id];
                     if( undefined === ownerPage ){
-                        chatOutput.Input({ action: 'alert', type: 'Caution', text: 'Current page is the player book mark page. <b>Recommend using the party split</b> feature to select the page you wish to edit.'});
+                        chatOutput.Input({ action: 'alert', type: 'Caution', text: 'Current page is the player book mark page. '
+                            + '<b>Recommend using the party split</b> feature to select the page you wish to edit.'});
                         return Campaign().get('playerpageid');
                     }else{
                         return ownerPage;
@@ -2007,22 +2013,17 @@ var DungeonConnect = DungeonConnect || (function(){
                 },
                 loadPack = function() {
                     var tempPack, installedWalls = [], bits,bit8,bit7,bit6,bit5,bit4,bit3,bit2,bit1,flip,fValue,pushValues;
-                    Object.keys(DungeonConnectWalls.WallTextures).forEach(function(key) {
-                        installedWalls.push(key);
-                    });
+                    Object.keys(DungeonConnectWalls.WallTextures).forEach(function(key) { installedWalls.push(key); });
                     wallTextures = [];
                     _.each(installedWalls, function(eachPack) {
                         tempPack = DungeonConnectWalls.WallTextures[eachPack];
                         _.each(tempPack, function(eachTile) {
                             switch(eachTile.type){
                                 case 'node':
-                                    pushValues = {
-                                        key: eachTile.key, pack: eachPack, type: eachTile.type,url: eachTile.url, 
-                                        value: eachTile.value, degree: eachTile.degree, flip: false
-                                    };
+                                    pushValues = { key: eachTile.key, pack: eachPack, type: eachTile.type,url: eachTile.url, 
+                                        value: eachTile.value, degree: eachTile.degree, flip: false };
                                     tilePusher(pushValues);
-                                    bits = '00000000' + parseInt(eachTile.value, 10).toString(2);
-                                    bits = bits.substr(bits.length - 8);
+                                    bits = '00000000' + parseInt(eachTile.value, 10).toString(2); bits = bits.substr(bits.length - 8);
                                     bit8 = bits.substring(0, 1); bit7 = bits.substring(1, 2); bit6 = bits.substring(2, 3); bit5 = bits.substring(3, 4);
                                     bit4 = bits.substring(4, 5); bit3 = bits.substring(5, 6); bit2 = bits.substring(6, 7); bit1 = bits.substring(7, 8);
                                     flip = bit6+bit7+bit8+bit1+bit2+bit3+bit4+bit5;
@@ -2034,12 +2035,8 @@ var DungeonConnect = DungeonConnect || (function(){
                                     tilePusher(pushValues);
                                 break;
                                 default:
-                                wallTextures.push({
-                                    key: eachTile.key, pack: eachPack, type: eachTile.type,url: eachTile.url, 
-                                    value: eachTile.value, 
-                                    degree: eachTile.degree,
-                                    flip: false
-                                });
+                                    wallTextures.push({ key: eachTile.key, pack: eachPack, type: eachTile.type,url: eachTile.url, 
+                                        value: eachTile.value, degree: eachTile.degree, flip: false });
                                 break;
                             }
                         });
@@ -2048,10 +2045,10 @@ var DungeonConnect = DungeonConnect || (function(){
                 refreshData = function() {
                     var players = findObjs({type: 'player'}), ownerId = _.find(_.pluck(players,'id'),playerIsGM);
                     if ( undefined === ownerId ){
-                        chatOutput.Input({action: 'alert', type: 'Halt', text: 'Script halted. State failed to initialize due to <b>no GM</b> being found.'});
+                        chatOutput.Input({action: 'alert', type: 'Halt', text: 'State failed to initialize due to <b>no GM</b> being found.'});
                     }
                     if( !checkOwnerName(players,ownerId) ) {
-                        chatOutput.Input({action: 'alert', type: 'Halt', text: 'Script halted. State failed to initialize due to <b>GMs not having unique names.<b>'});
+                        chatOutput.Input({action: 'alert', type: 'Halt', text: 'State failed to initialize due to <b>GMs not having unique names.<b>'});
                     }
                     //delete state.DungeonConnect;
                     //delete state.DungeonConnectPaths;
