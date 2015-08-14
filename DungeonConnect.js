@@ -4,9 +4,9 @@
 var DungeonConnect = DungeonConnect || (function(){
     'use strict';
     
-    var version = 0.5,
-        lastUpdate = 1439207564, //Unix timestamp
-        schemaVersion = 0.5, 
+    var version = 0.6,
+        lastUpdate = 1439553559, //Unix timestamp
+        schemaVersion = 0.6, 
         
         defaultWalls = 'Simple_Stone',
         wallTextures = [],
@@ -300,31 +300,24 @@ var DungeonConnect = DungeonConnect || (function(){
                             + '</div>'
                         + '</div>'
                         + '<br><a href="!DungeonConnectFillCanel"' + cssButtonAnchor + ' ><span' + cssButtonSpan + '>✗-Cancel-Fill-Area</span></a>'
-                        
                         + '<br><a href="!DungeonConnectFill" ' + cssButtonAnchor + '><span' + cssButtonSpan + '>'
                                 +'<img src="https://s3.amazonaws.com/files.d20.io/images/11490036/r3DfvpoIWwNpewJgYFS-0A/thumb.png?1439404240" height="50" width="50" border="0" ' + cssButtonImg + '>'
                             +' Fill-Area</span></a>'
-                        //+ '<br><a href="!DungeonConnectFill"' + cssButtonAnchor + ' ><span' + cssButtonSpan + '>◨-Fill-Area</span></a>'
                         + '<br><a href="!DungeonConnectMergePoints" ' + cssButtonAnchor + '><span' + cssButtonSpan + '>'
                                 +'<img src="https://s3.amazonaws.com/files.d20.io/images/11490039/Ur4bpYIWly2GULz6q1ec0g/thumb.png?1439404250" height="50" width="50" border="0" ' + cssButtonImg + '>'
                             +' Merge-Points</span></a>'
-                        //+ '<br><a href="!DungeonConnectMergePoints"' + cssButtonAnchor + ' ><span' + cssButtonSpan + '>◉◉-Merge-Points</span></a>'
                         + '<br><a href="!DungeonConnectConnectPoints" ' + cssButtonAnchor + '><span' + cssButtonSpan + '>'
                                 +'<img src="https://s3.amazonaws.com/files.d20.io/images/11489856/YPzC3yXl2Cbevo7mjftnpw/thumb.png?1439403620" height="50" width="50" border="0" ' + cssButtonImg + '>'
                             +' Connect-Points</span></a>'
-                        //+ '<br><a href="!DungeonConnectConnectPoints"' + cssButtonAnchor + ' ><span' + cssButtonSpan + '>◉◉-Connect-Points</span></a>'
                         + '<br><a href="!DungeonConnectBranchPoint" ' + cssButtonAnchor + '><span' + cssButtonSpan + '>'
                                 +'<img src="https://s3.amazonaws.com/files.d20.io/images/11489223/Y1T2eIf8NpxHSTR0q22emA/thumb.png?1439401310" height="50" width="50" border="0" ' + cssButtonImg + '>'
                             +' Branch-Point</span></a>'
-                        //+ '<br><a href="!DungeonConnectBranchPoint"' + cssButtonAnchor + ' ><span' + cssButtonSpan + '>◉-Branch-Point</span></a>'
                         + '<br><a href="!DungeonConnectAddPoint" ' + cssButtonAnchor + '><span' + cssButtonSpan + '>'
                                 +'<img src="https://s3.amazonaws.com/files.d20.io/images/11489404/mgRVaaXCvFhsB-FreYk7Rw/thumb.png?1439402048" height="50" width="50" border="0" ' + cssButtonImg + '>'
                             +' Add-Point</span></a>'
-                        //+ '<br><a href="!DungeonConnectAddPoint"' + cssButtonAnchor + ' ><span' + cssButtonSpan + '>▣-Add-Point</span></a>'
                         + '<br><a href="!DungeonConnectAddSegment" ' + cssButtonAnchor + '><span' + cssButtonSpan + '>'
                                 +'<img src="https://s3.amazonaws.com/files.d20.io/images/11489510/LKDxr9i5o0wBehGXX8qMFQ/thumb.png?1439402349" height="50" width="50" border="0" ' + cssButtonImg + '>'
                             +' Add-Segment</span></a>'
-                        //+ '<br><a href="!DungeonConnectAddSegment"' + cssButtonAnchor + ' ><span' + cssButtonSpan + '>+-Add-Segment</span></a>'
                         + '<br><a href="!DungeonConnectMore"' + cssButtonAnchor + ' ><span' + cssButtonSpan + '>⇓-More Commands</span></a>';
                     }else{  
                         menuText = '/w '  + state.DungeonConnect.who  + ' '
@@ -378,6 +371,72 @@ var DungeonConnect = DungeonConnect || (function(){
         }()), 
 // ~~~> Chat Output <~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+
+// ~~~> Direct Path Add <~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+// ~~~> Direct Path Add <~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        pathingTool = (function(){
+            var pathChecker = function (obj){ 
+                    var check = true, firstX = false, firstY = false, lastX, lastY;
+                    _.each(JSON.parse(obj.get('path')), function(eachPoint) {
+                        if( false === firstX ) { firstX = eachPoint[1]; firstY = eachPoint[2]; }
+                        lastX = eachPoint[1]; lastY = eachPoint[2];
+                        if( 3 !== eachPoint.length ) { check = false; return false; }
+                    });
+                    if ( ('gmlayer' !== obj.get('layer')) ) { check = false; }
+                    return check;
+                },
+                snapPathing = function(obj) {
+                    var pathResult = '[', atX, atY, firstX, firstY, lastX, lastY, closed = false;
+                    _.each(JSON.parse(obj.get('path')), function(eachPoint) {
+                        atX = eachPoint[1] + obj.get('left') - (obj.get('width') / 2);
+                        atY = eachPoint[2] + obj.get('top') - (obj.get('height') / 2);
+                        if( undefined === firstX ) { firstX = atX; firstY = atY; }
+                        lastX = atX;
+                        lastY = atY;
+                        pathResult = pathResult + '[' + atX + ',' + atY + '],';
+                    });
+                    pathResult = pathResult.substring(0, pathResult.length - 1);
+                    pathResult = pathResult + ']';
+                    if( lastX === firstX && lastY === firstY ) {closed = true; }
+                return {path: pathResult, closedPath: closed}
+                },
+                handlePathAdd = function(obj) {
+                    var goodPath = pathChecker(obj),snappedPath,newPath,ab,a,b,x1,y1,x2,y2,stepArray,f,sxy1,sxy2,lastPoint;
+                    if( false === goodPath ) {return; }
+                    if( obj.get('pageid') !== state.DungeonConnect.page && obj.get('pageid') !== Campaign().get('playerpageid') ) {return; }
+                    snappedPath = snapPathing(obj);
+                    stepArray = JSON.parse(snappedPath.path);
+                    sxy1 = stepArray.shift();
+                    sxy2 = stepArray.shift();
+                    x1 = (Math.floor(sxy1[0]/70) * 70) + 35;
+                    y1 = (Math.floor(sxy1[1]/70) * 70) + 35;
+                    x2 = (Math.floor(sxy2[0]/70) * 70) + 35;
+                    y2 = (Math.floor(sxy2[1]/70) * 70) + 35;
+                    ab = pathDrawing.pathOne(x1,y1,x2,y2);
+                    if( true === snappedPath.closedPath ) {
+                        stepArray.pop();
+                    }
+                    b = ab.b;
+                    while (stepArray.length > 0) {
+                        sxy1 = stepArray.shift();
+                        x1 = (Math.floor(sxy1[0]/70) * 70) + 35;
+                        y1 = (Math.floor(sxy1[1]/70) * 70) + 35;
+                        b = pathDrawing.pathTwo(b.get('id'),x1,y1);
+                    }
+                    if( true === snappedPath.closedPath ) {
+                        _.debounce(pathDrawing.pathClose(ab.a.get('id'),b.get('id')), 500);
+                    }
+                    obj.remove();
+                },
+                registerEventHandlers = function(){
+                    on('add:path', handlePathAdd);
+                };
+        return {
+            RegisterEventHandlers: registerEventHandlers
+        };
+        }()),
 
 // ~~~> Features Toggle <~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         featuresToggle = (function(){
@@ -886,7 +945,6 @@ var DungeonConnect = DungeonConnect || (function(){
                         }
                     }
                 },
-                
                 registerEventHandlers = function(){
                     on('change:graphic',    handleGraphicChange);
                 };
@@ -921,7 +979,6 @@ var DungeonConnect = DungeonConnect || (function(){
                             left: xOffset, top: yOffset, width: 70, height: 70,
                             layer: 'map', controlledby: id, rotation: rot
                     });
-                    
                 },
                 nodeBorder = function(bits,xOffset,yOffset,id,page,rotOffset) {
                     var tileSrc = _.where(wallTextures, {pack: state.DungeonConnect.currentWalls, key: 'DC_000'})[0].url;
@@ -956,10 +1013,8 @@ var DungeonConnect = DungeonConnect || (function(){
                         break;
                     }
                 },
-          
                 nodeBranchMaker = function(nodeId) {
                     var pathList = stateIndexX[nodeId],p,nodeValue = 0,aId,bId,wallParts,bits,direction,node;
-                    
                     _.each(pathList, function(pathId) {
                         p = state.DungeonConnectPaths[pathId];
                         if( undefined !== p) {
@@ -973,15 +1028,12 @@ var DungeonConnect = DungeonConnect || (function(){
                             }
                         }
                     });
-                    
                     wallParts = findObjs({layer: 'map', type: 'graphic', controlledby: nodeId });
                     _.each(wallParts, function(wp) {wp.remove(); });
                     node = getObj('graphic', nodeId);
                     if( 256 === nodeValue || 0 === nodeValue || undefined === node ){return; }
-                    
                     bits = '00000000' + parseInt(nodeValue, 10).toString(2);
                     bits = bits.substr(bits.length - 8);
-                    
                     direction = bits.substring(0,3);
                     nodeBorder(direction,node.get('left'),node.get('top') - 70,nodeId,node.get('pageid'),0);
                     direction = bits.substring(2,5);
@@ -992,7 +1044,6 @@ var DungeonConnect = DungeonConnect || (function(){
                     nodeBorder(direction,node.get('left') - 70,node.get('top'),nodeId,node.get('pageid'),270);
                     nodeCenter(node,nodeValue);
                 },
-            
                 getInput = function() {
                     var a,wallPart;
                     _.each(nodeUpdated, function(nodeId) {
@@ -1185,7 +1236,6 @@ var DungeonConnect = DungeonConnect || (function(){
                             && 'DungeonConnectPost' === dot.get('controlledby') && 'gmlayer' === dot.get('layer')) 
                         {return true; }else{return false; }
                     });
-                    
                     if( 1 !== dotOverlap.length ) {obj.set('tint_color', postBad);
                     }else{obj.set('tint_color', postGood); }
                 },
@@ -1193,7 +1243,6 @@ var DungeonConnect = DungeonConnect || (function(){
                     var allPostOnPage = findObjs({pageid: obj.get('pageid'),                              
                         type: 'graphic', controlledby: 'DungeonConnectPost',
                         layer: 'gmlayer'});
-                        
                     _.each(allPostOnPage, function(postFound) {
                         postOverlapChecker(postFound);
                     });
@@ -1251,8 +1300,7 @@ var DungeonConnect = DungeonConnect || (function(){
                 nudgeBranch = function(id) {
                     var x,xy = utilities.GetMapCenterSquare(),m,c,pathReturned,
                         postValues = {
-                            left: 35, top: 35,
-                            width: 70, height: 70,
+                            left: 35, top: 35, width: 70, height: 70,
                             layer: controls, pageid: state.DungeonConnect.page || Campaign().get('playerpageid'),
                             imgsrc: post, controlledby: 'NEWDungeonConnectPost',
                             tint_color: postGood, isdrawing: true
@@ -1487,6 +1535,72 @@ var DungeonConnect = DungeonConnect || (function(){
                     }
                     nudgeAddPoint(selected[0].get('id'));
                 },
+                newclose = function(id1,id2) {
+                    var a, b, m, pathReturned,
+                        postValues = {
+                            left: 35, top: 35, width: 70, height: 70,
+                            layer: controls, pageid: state.DungeonConnect.page || Campaign().get('playerpageid'),
+                            imgsrc: post, controlledby: 'NEWDungeonConnectPost',
+                            tint_color: postGood, isdrawing: true
+                        };
+                    a = getObj('graphic', id1);
+                    b = getObj('graphic', id2);
+                    postValues.imgsrc = middle;
+                    postValues.controlledby = 'NewMiddlePost';
+                    postValues.left = (a.get('left') + b.get('left')) / 2;
+                    postValues.top = (a.get('top') + b.get('top')) / 2;
+                    m = createObj('graphic', postValues);
+                    _.debounce(pathReturned = createSegmentPath(a, b, m), 500);
+                    pathUpdated.push(pathReturned.id);
+                    nodeUpdated.push(pathReturned.aNodeId);
+                    nodeUpdated.push(pathReturned.bNodeId);
+                    getInput('none');
+                },
+                newBranch = function(id,x2,y2) {
+                    var x,m,b,pathReturned,
+                        postValues = {
+                            left: x2, top: y2, width: 70, height: 70,
+                            layer: controls, pageid: state.DungeonConnect.page || Campaign().get('playerpageid'),
+                            imgsrc: post, controlledby: 'NEWDungeonConnectPost',
+                            tint_color: postGood, isdrawing: true
+                        };
+                    x = getObj('graphic', id);
+                    b = createObj('graphic', postValues);
+                    postValues.imgsrc = middle;
+                    postValues.left = (postValues.left + x.get('left')) / 2;
+                    postValues.top = (postValues.top + x.get('top')) / 2;
+                    postValues.controlledby = 'NewMiddlePost';
+                    m = createObj('graphic', postValues);
+                    _.debounce(pathReturned = createSegmentPath(x, b, m), 500);
+                    pathUpdated.push(pathReturned.id);
+                    nodeUpdated.push(pathReturned.aNodeId);
+                    nodeUpdated.push(pathReturned.bNodeId);
+                    getInput('none');
+                    return b;
+                },
+                newSegment = function(x1,y1,x2,y2) {
+                    var a, b, m, postValues, pathReturned;
+                    postValues = {
+                        left: x1, top: y1, width: 70, height: 70,
+                        layer: controls, pageid: state.DungeonConnect.page || Campaign().get('playerpageid'),
+                        imgsrc: post, controlledby: 'NEWDungeonConnectPost', 
+                        tint_color: postGood, isdrawing: true
+                    };
+                    a = createObj('graphic', postValues);
+                    postValues.left = x2; postValues.top = y2;
+                    b = createObj('graphic', postValues);
+                    postValues.imgsrc = middle;
+                    postValues.left = (x1 + x2) / 2;
+                    postValues.top = (y1 + y2) / 2;
+                    postValues.controlledby = 'NewMiddlePost';
+                    m = createObj('graphic', postValues);
+                    _.debounce(pathReturned = createSegmentPath(a, b, m), 500);
+                    pathUpdated.push(pathReturned.id);
+                    nodeUpdated.push(pathReturned.aNodeId);
+                    nodeUpdated.push(pathReturned.bNodeId);
+                    getInput('none');
+                    return {a: a, b: b};
+                },
                 addSegment = function() {
                     var mapCenterSquare = utilities.GetMapCenterSquare(), a, b, m, postValues = {
                         left: mapCenterSquare.x - 140, top: mapCenterSquare.y - 140, width: 70, height: 70,
@@ -1572,13 +1686,9 @@ var DungeonConnect = DungeonConnect || (function(){
                     deleteList = stateIndexX[dId];
                     _.each(deleteList, function(pathId) {
                         ad = state.DungeonConnectPaths[pathId].aNodeId;
-                        if( undefined !== ad ) {
-                            stateIndexX[ad] = _.without(stateIndexX[ad], pathId);
-                        }
+                        if( undefined !== ad ) { stateIndexX[ad] = _.without(stateIndexX[ad], pathId); }
                         bd = state.DungeonConnectPaths[pathId].bNodeId;
-                        if( undefined !== bd ) {
-                            stateIndexX[bd] = _.without(stateIndexX[bd], pathId);
-                        }
+                        if( undefined !== bd ) { stateIndexX[bd] = _.without(stateIndexX[bd], pathId); }
                         p = getObj('path', state.DungeonConnectPaths[pathId].id);
                         g = getObj('path', state.DungeonConnectPaths[pathId].clone);
                         p.set('controlledby', 'removed'); p.remove(); delete stateIndexP[p.get('id')];
@@ -1594,17 +1704,14 @@ var DungeonConnect = DungeonConnect || (function(){
                         case 'BranchPoint':    branchPoint(input.message);     break;
                         case 'ConnectPoints':  connectPoints(input.message);   break;
                         case 'MergePoints':    mergePoints(input.message);     break;
+                        case 'MergePoints':    mergePoints(input.message);     break;
                     }
                     pathUpdated = _.uniq(pathUpdated);
                     nodeUpdated = _.uniq(nodeUpdated);
                     setTimeout(function() {wallDrawing.Input(); }, 200);
                     setTimeout(function() {nodeDrawing.Input(); }, 200);
-                    if('nudge' === input ) {
-                        nudgeBranch(id);
-                    }
-                    if('nudgeM' === input ) {
-                        nudgeAddPoint(id);
-                    }
+                    if('nudge' === input ) { nudgeBranch(id); }
+                    if('nudgeM' === input ) { nudgeAddPoint(id); }
                 },
                 middlePostMove = function(obj) {
                     var pathId = stateIndexM[obj.get('id')],a,b,leftMove,topMove,oldLeft,oldTop,deltaLeft,deltaTop;
@@ -1643,7 +1750,6 @@ var DungeonConnect = DungeonConnect || (function(){
                     targetPathId = deleteList[0];
                     pathData = state.DungeonConnectPaths[targetPathId];
                     aEndId = pathData.aNodeId;
-                    //bEndId = pathData.bNodeId;
                     p = getObj('path', targetPathId);
                     m = getObj('graphic', pathData.mNodeId);
                     g = getObj('path', pathData.clone);
@@ -1723,18 +1829,11 @@ var DungeonConnect = DungeonConnect || (function(){
                            layer = 'objects';
                         }
                         pathData = state.DungeonConnectPaths[pathData];
-                        if( undefined === pathData ) {
-                           return; 
-                        }
+                        if( undefined === pathData ) { return; }
                         obj.set({
-                            left: pathData.mNodeLeft,
-                            top: pathData.mNodeTop,
-                            width: pathData.width,
-                            height: pathData.height,
-                            rotation: 0,
-                            scaleX: 1,
-                            scaleY: 1,
-                            layer: layer
+                            left: pathData.mNodeLeft, top: pathData.mNodeTop,
+                            width: pathData.width, height: pathData.height,
+                            rotation: 0, scaleX: 1, scaleY: 1, layer: layer
                         });
                     }
                 },
@@ -1799,7 +1898,10 @@ var DungeonConnect = DungeonConnect || (function(){
                 };
         return {
             RegisterEventHandlers: registerEventHandlers,
-            Input: getInput
+            Input: getInput,
+            pathOne: newSegment,
+            pathTwo: newBranch,
+            pathClose: newclose
         };
     }()),
 // ~~~> Path Drawing <~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  
@@ -2001,6 +2103,7 @@ var DungeonConnect = DungeonConnect || (function(){
             floorDrawing.RegisterEventHandlers();
             features.RegisterEventHandlers();
             featuresToggle.RegisterEventHandlers();
+            pathingTool.RegisterEventHandlers();
         };
    return {
        RegisterEventHandlers: registerEventHandlers
