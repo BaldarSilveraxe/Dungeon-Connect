@@ -4,9 +4,9 @@
 var DungeonConnect = DungeonConnect || (function(){
     'use strict';
     
-    var version = 0.7,
-        lastUpdate = 1439553559, //Unix timestamp
-        schemaVersion = 0.7, 
+    var version = 0.8,
+        lastUpdate = 1439641481, //Unix timestamp
+        schemaVersion = 0.8, 
         
         defaultWalls = 'Simple_Stone',
         wallTextures = [],
@@ -900,54 +900,49 @@ var DungeonConnect = DungeonConnect || (function(){
 
 // ~~~> FloorDrawing <~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         floorDrawing = (function(){
-            var wallCheck = function (pixelPos) {
-                var mapParts = findObjs({pageid: state.DungeonConnect.page || Campaign().get('playerpageid'),                              
-                        type: 'graphic', layer: 'map', left: pixelPos.x, top: pixelPos.y
+            var floorTileList = [], 
+                fillArea = function(l,t,p) {
+                    var mapParts = findObjs({pageid: p, type: 'graphic', layer: 'map'}),
+                        page = getObj('page', p), mapMaxX = page.get('width') * 70, mapMaxY = page.get('height') * 70,
+                        locationList = [{x: l, y: t}], mapMinX = 0, mapMinY = 0, atLocation, fiilList = [],
+                        url = _.where(wallTextures, {pack: state.DungeonConnect.currentWalls, key: 'DC_008'})[0].url;
+                    floorTileList = [];
+                    _.each(mapParts, function(mp) {
+                        floorTileList[mp.get('left') + ':' + mp.get('top')] = 'filled';
                     });
-                if( 0 === mapParts.length ){return true; }
-                return false;
-            },
-            placeFloor = function(l,t) {
-                createObj('graphic', {
-                    pageid: state.DungeonConnect.page || Campaign().get('playerpageid'), 
-                    imgsrc: _.where(wallTextures, {pack: state.DungeonConnect.currentWalls, key: 'DC_008'})[0].url, 
-                    name: 'Floor', left: l, top: t, width: 70, height: 70, layer: 'map', controlledby: 'Floor'
-                });
-            },
-            fillArea = function(l,t) {
-                    var page, locationList = [{x: l, y: t}],atLocation,mapMinX,mapMinY,mapMaxX,mapMaxY;
-                    page = findObjs({id: state.DungeonConnect.page || Campaign().get('playerpageid') });
-                    mapMinX = 0;
-                    mapMinY = 0;
-                    mapMaxX = page[0].get('width') * 70;
-                    mapMaxY = page[0].get('height') * 70;
                     while(locationList.length) {
                         atLocation = locationList.pop();
-                        if( wallCheck(atLocation) 
+                        if( undefined === floorTileList[atLocation.x + ':' + atLocation.y]
                             && ((atLocation.x - 70) > mapMinX)
                             && ((atLocation.x + 70) < mapMaxX)
                             && ((atLocation.y - 70) > mapMinY)
                             && ((atLocation.y + 70) < mapMaxY)) 
                         {
-                            placeFloor(atLocation.x,atLocation.y);
+                            floorTileList[atLocation.x + ':' + atLocation.y] = 'filled';
+                            fiilList.push({ pageid: p, imgsrc: url,  name: 'Floor', 
+                                left: atLocation.x, top: atLocation.y, width: 70, 
+                                height: 70, layer: 'map', controlledby: 'Floor'
+                            });
                             locationList.push({x: atLocation.x + 70, y: atLocation.y});
                             locationList.push({x: atLocation.x - 70, y: atLocation.y});
                             locationList.push({x: atLocation.x, y: atLocation.y + 70});
                             locationList.push({x: atLocation.x, y: atLocation.y - 70});
                         }
                     }
+                    _.each(fiilList, function(fl) {
+                        deferredCreateObj('graphic', fl);
+                    });
                 },
                 handleGraphicChange = function(obj) {
                     if( 'FillBucket' === obj.get('controlledby') ) {
                         if( 0 !== obj.get('rotation')) {
-                            fillArea(obj.get('left'),obj.get('top'));
-                            log('here')
+                            fillArea(obj.get('left'),obj.get('top'),obj.get('pageid'));
                         }
                         obj.set({
-                                rotation: 0, 
-                                left: (Math.floor(obj.get('left')/70) * 70) + 35, 
-                                top: (Math.floor(obj.get('top')/70) * 70) + 35
-                            });
+                            rotation: 0, 
+                            left: (Math.floor(obj.get('left')/70) * 70) + 35, 
+                            top: (Math.floor(obj.get('top')/70) * 70) + 35
+                        });
                     }
                 },
                 registerEventHandlers = function(){
